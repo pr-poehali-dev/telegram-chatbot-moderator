@@ -171,6 +171,18 @@ def handler(event: dict, context) -> dict:
             (chat_db_id, member_id, violation_type, text[:500], action_taken)
         )
 
+        print(json.dumps({
+            'event': 'violation_detected',
+            'chat_id': telegram_chat_id,
+            'chat_title': chat.get('title', ''),
+            'user_id': telegram_user_id,
+            'username': username,
+            'violation_type': violation_type,
+            'action_taken': action_taken,
+            'warns_count': warns_count,
+            'message_text': text[:500]
+        }, ensure_ascii=False))
+
     conn.commit()
     cur.close()
     conn.close()
