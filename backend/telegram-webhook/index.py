@@ -13,15 +13,17 @@ def get_conn():
 def tg_call(method: str, payload: dict):
     token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not token:
-        return None
+        return {'error': 'TELEGRAM_BOT_TOKEN not set'}
     url = f'https://api.telegram.org/bot{token}/{method}'
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
     try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             return json.loads(resp.read().decode('utf-8'))
-    except Exception:
-        return None
+    except urllib.error.HTTPError as e:
+        return {'error': f'HTTP {e.code}', 'detail': e.read().decode('utf-8')}
+    except Exception as e:
+        return {'error_type': type(e).__name__, 'error': str(e), 'cause': str(getattr(e, 'reason', ''))}
 
 
 LINK_RE = re.compile(r'(https?://|www\.|t\.me/|@[a-zA-Z0-9_]{5,})', re.IGNORECASE)
@@ -46,6 +48,14 @@ def handler(event: dict, context) -> dict:
         }
 
     headers = {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'}
+
+    if method == 'GET':
+        params = event.get('queryStringParameters') or {}
+        if params.get('set_webhook_url'):
+            result = tg_call('setWebhook', {'url': params['set_webhook_url']})
+            return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'ok': True, 'telegram_response': result})}
+        info = tg_call('getWebhookInfo', {})
+        return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'ok': True, 'webhook_info': info})}
 
     try:
         body = json.loads(event.get('body') or '{}')
